@@ -32,6 +32,22 @@ func setUp(t *testing.T) {
 
 func TestNotNull(t *testing.T) {
 	setUp(t)
+	err := db.QueryRow("INSERT INTO accounts (id) VALUES (null)").Scan()
+	dberr := GetDBError(err)
+	switch e := dberr.(type) {
+	case *DBError:
+		{
+			test.AssertEquals(t, e.Error(), "No id was provided. Please provide a id")
+			test.AssertEquals(t, e.Column, "id")
+			test.AssertEquals(t, e.Table, "accounts")
+		}
+	default:
+		t.Fail()
+	}
+}
+
+func TestInvalidUUID(t *testing.T) {
+	setUp(t)
 	var id string
 	err := db.QueryRow("INSERT INTO accounts (id) VALUES ($1)", "foo").Scan(&id)
 	dberr := GetDBError(err)
