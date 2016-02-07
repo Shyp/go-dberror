@@ -1,0 +1,7 @@
+development:
+    driver: postgres
+    open: dbname=dberror sslmode=disable
+
+circle:
+    driver: postgres
+    open: user=ubuntu dbname=circle_test sslmode=disable
