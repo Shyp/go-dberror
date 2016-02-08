@@ -10,6 +10,8 @@ import (
 	"github.com/Shyp/go-dberror/Godeps/_workspace/src/github.com/lib/pq"
 )
 
+// See http://www.postgresql.org/docs/9.3/static/errcodes-appendix.html for
+// a full listing of the error codes present here.
 const (
 	CodeNumericValueOutOfRange    = "22003"
 	CodeInvalidTextRepresentation = "22P02"
@@ -18,6 +20,9 @@ const (
 	CodeCheckViolation            = "23514"
 )
 
+// Error is a human-readable database error. Message should always be a
+// non-empty, readable string, and is returned when you call err.Error(). The
+// other fields may or may not be empty.
 type Error struct {
 	Message    string
 	Code       string
@@ -33,14 +38,22 @@ func (dbe *Error) Error() string {
 	return dbe.Message
 }
 
+// Constraint is a custom database check constraint you've defined, like "CHECK
+// balance > 0". Postgres doesn't define a very useful message for constraint
+// failures (new row for relation "accounts" violates check constraint), so you
+// can define your own. The Name should be the name of the constraint in the
+// database. Define GetError to provide your own custom error handler for this
+// constraint failure, with a custom message.
 type Constraint struct {
 	Name     string
 	GetError func(*pq.Error) *Error
 }
 
-var constraintMap = map[string]Constraint{}
+var constraintMap = map[string]*Constraint{}
 
-func RegisterConstraint(c Constraint) {
+// RegisterConstraint tells dberror about your custom constraint and its error
+// handling.
+func RegisterConstraint(c *Constraint) {
 	constraintMap[c.Name] = c
 }
 
@@ -87,7 +100,9 @@ func findValue(detail string) string {
 }
 
 // GetError parses a given database error and returns a human-readable
-// version of that error. If the error is unknown, it's returned as is.
+// version of that error. If the error is unknown, it's returned as is,
+// however, all errors of type `pq.Error` are re-thrown as an Error, so it's
+// impossible to get a `pq.Error` back from this function.
 func GetError(err error) error {
 	if err == nil {
 		return nil
@@ -158,7 +173,6 @@ func GetError(err error) error {
 				}
 			}
 		default:
-			fmt.Printf("%#v\n", pqerr)
 			return &Error{
 				Message:    pqerr.Message,
 				Code:       string(pqerr.Code),

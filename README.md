@@ -12,7 +12,7 @@ the native error messages returned by Postgres?
 > null value in column \"id\" violates not-null constraint
 
 This library attempts to parse those error messages and return error messages
-that you can expose via your REST API.
+that you can expose via your API.
 
 > No id was provided. Please provide a id
 

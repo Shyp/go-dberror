@@ -74,7 +74,7 @@ func TestDefaultConstraint(t *testing.T) {
 
 func TestCustomConstraint(t *testing.T) {
 	setUp(t)
-	constraint := Constraint{
+	constraint := &Constraint{
 		Name: "accounts_balance_check",
 		GetError: func(e *pq.Error) *Error {
 			return &Error{
