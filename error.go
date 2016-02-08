@@ -16,6 +16,7 @@ const (
 	CodeNumericValueOutOfRange    = "22003"
 	CodeInvalidTextRepresentation = "22P02"
 	CodeNotNullViolation          = "23502"
+	CodeForeignKeyViolation       = "23503"
 	CodeUniqueViolation           = "23505"
 	CodeCheckViolation            = "23514"
 )
@@ -65,10 +66,12 @@ func capitalize(s string) string {
 
 var columnFinder *regexp.Regexp
 var valueFinder *regexp.Regexp
+var foreignKeyFinder *regexp.Regexp
 
 func init() {
 	columnFinder = regexp.MustCompile(`Key \((.+)\)=`)
 	valueFinder = regexp.MustCompile(`Key \(.+\)=\((.+)\)`)
+	foreignKeyFinder = regexp.MustCompile(`not present in table "(.+)"`)
 }
 
 // findColumn finds the column in the given pq Detail error string. If the
@@ -92,6 +95,20 @@ func findColumn(detail string) string {
 //    Key (id)=(3c7d2b4a-3fc8-4782-a518-4ce9efef51e7) already exists.
 func findValue(detail string) string {
 	results := valueFinder.FindStringSubmatch(detail)
+	if len(results) < 2 {
+		return ""
+	} else {
+		return results[1]
+	}
+}
+
+// findColumn finds the referenced table in the given pq Detail error string.
+// If we can't find the table, we return the empty string.
+//
+// detail can look like this:
+//    Key (account_id)=(91f47e99-d616-4d8c-9c02-cbd13bceac60) is not present in table "accounts"
+func findForeignKeyTable(detail string) string {
+	results := foreignKeyFinder.FindStringSubmatch(detail)
 	if len(results) < 2 {
 		return ""
 	} else {
@@ -134,6 +151,34 @@ func GetError(err error) error {
 				dbe.Column = columnName
 			}
 			return dbe
+		case CodeForeignKeyViolation:
+			columnName := findColumn(pqerr.Detail)
+			if columnName == "" {
+				columnName = "value"
+			}
+			foreignKeyTable := findForeignKeyTable(pqerr.Detail)
+			var tablePart string
+			if foreignKeyTable == "" {
+				tablePart = "in the parent table"
+			} else {
+				tablePart = fmt.Sprintf("in the %s table", foreignKeyTable)
+			}
+			valueName := findValue(pqerr.Detail)
+			var msg string
+			if valueName == "" {
+				msg = fmt.Sprintf("Can't save to %s because the %s isn't present %s", pqerr.Table, columnName, tablePart)
+			} else {
+				msg = fmt.Sprintf("Can't save to %s because the %s (%s) isn't present %s", pqerr.Table, columnName, valueName, tablePart)
+			}
+			return &Error{
+				Message:    msg,
+				Code:       string(pqerr.Code),
+				Column:     pqerr.Column,
+				Constraint: pqerr.Constraint,
+				Table:      pqerr.Table,
+				Routine:    pqerr.Routine,
+				Severity:   pqerr.Severity,
+			}
 		case CodeNumericValueOutOfRange:
 			msg := strings.Replace(pqerr.Message, "out of range", "too large or too small", 1)
 			return &Error{

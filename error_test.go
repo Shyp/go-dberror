@@ -175,6 +175,24 @@ func TestUniqueFailureOnUpdate(t *testing.T) {
 	tearDown(t)
 }
 
+func TestForeignKeyFailure(t *testing.T) {
+	setUp(t)
+	query := "INSERT INTO payments (id, account_id) VALUES ($1, $2)"
+	_, err := db.Exec(query, uuid, uuid2)
+
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "Can't save to payments because the account_id (91f47e99-d616-4d8c-9c02-cbd13bceac60) isn't present in the accounts table")
+		test.AssertEquals(t, e.Column, "")
+		test.AssertEquals(t, e.Table, "payments")
+		test.AssertEquals(t, e.Code, CodeForeignKeyViolation)
+	default:
+		t.Fail()
+	}
+	tearDown(t)
+}
+
 func TestCapitalize(t *testing.T) {
 	test.AssertEquals(t, capitalize("foo"), "Foo")
 	test.AssertEquals(t, capitalize("foo bar baz"), "Foo bar baz")
