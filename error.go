@@ -65,7 +65,6 @@ func GetDBError(err error) error {
 				Severity: pqerr.Severity,
 			}
 		case CodeCheckViolation:
-			fmt.Printf("%#v\n", (pqerr))
 			c, ok := constraintMap[pqerr.Constraint]
 			if ok {
 				return c.GetError(pqerr)
