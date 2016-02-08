@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/lib/pq"
+	"github.com/Shyp/go-dberror/Godeps/_workspace/src/github.com/lib/pq"
 )
 
 const (
