@@ -22,6 +22,10 @@ that you can expose via your API.
 
 > Invalid account_status: "blah"
 
+> Can't save to payments because the account_id (91f47e99-d616-4d8c-9c02-cbd13bceac60) isn't present in the accounts table
+
+> A email already exists with this value (test@example.com)
+
 In addition, this library exports common Postgres error codes, so you can check
 against them in your application.
 
