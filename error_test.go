@@ -15,7 +15,7 @@ const email = "test@example.com"
 var db *sql.DB
 
 func TestNilError(t *testing.T) {
-	test.AssertEquals(t, GetDBError(nil), nil)
+	test.AssertEquals(t, GetError(nil), nil)
 }
 
 func setUp(t *testing.T) {
@@ -37,9 +37,9 @@ func setUp(t *testing.T) {
 func TestNotNull(t *testing.T) {
 	setUp(t)
 	_, err := db.Exec("INSERT INTO accounts (id) VALUES (null)")
-	dberr := GetDBError(err)
+	dberr := GetError(err)
 	switch e := dberr.(type) {
-	case *DBError:
+	case *Error:
 		test.AssertEquals(t, e.Error(), "No id was provided. Please provide a id")
 		test.AssertEquals(t, e.Column, "id")
 		test.AssertEquals(t, e.Table, "accounts")
@@ -48,12 +48,27 @@ func TestNotNull(t *testing.T) {
 	}
 }
 
-func TestConstraint(t *testing.T) {
+func TestDefaultConstraint(t *testing.T) {
+	// this test needs to go before the Register() below... not great, add an
+	// unregister or clear out the map or something
+	setUp(t)
+	_, err := db.Exec("INSERT INTO accounts (id, email, balance) VALUES ($1, $2, -1)", uuid, email)
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "new row for relation \"accounts\" violates check constraint \"accounts_balance_check\"")
+		test.AssertEquals(t, e.Table, "accounts")
+	default:
+		t.Fail()
+	}
+}
+
+func TestCustomConstraint(t *testing.T) {
 	setUp(t)
 	constraint := Constraint{
 		Name: "accounts_balance_check",
-		GetError: func(e *pq.Error) *DBError {
-			return &DBError{
+		GetError: func(e *pq.Error) *Error {
+			return &Error{
 				Message:  "Cannot write a negative balance",
 				Severity: e.Severity,
 				Table:    e.Table,
@@ -64,9 +79,9 @@ func TestConstraint(t *testing.T) {
 	}
 	RegisterConstraint(constraint)
 	_, err := db.Exec("INSERT INTO accounts (id, email, balance) VALUES ($1, $2, -1)", uuid, email)
-	dberr := GetDBError(err)
+	dberr := GetError(err)
 	switch e := dberr.(type) {
-	case *DBError:
+	case *Error:
 		test.AssertEquals(t, e.Error(), "Cannot write a negative balance")
 		test.AssertEquals(t, e.Table, "accounts")
 	default:
@@ -76,12 +91,23 @@ func TestConstraint(t *testing.T) {
 
 func TestInvalidUUID(t *testing.T) {
 	setUp(t)
-	var id string
-	err := db.QueryRow("INSERT INTO accounts (id) VALUES ($1)", "foo").Scan(&id)
-	dberr := GetDBError(err)
+	_, err := db.Exec("INSERT INTO accounts (id) VALUES ('foo')")
+	dberr := GetError(err)
 	switch e := dberr.(type) {
-	case *DBError:
+	case *Error:
 		test.AssertEquals(t, e.Error(), "Invalid input syntax for type uuid: \"foo\"")
+	default:
+		t.Fail()
+	}
+}
+
+func TestInvalidStatus(t *testing.T) {
+	setUp(t)
+	_, err := db.Exec("INSERT INTO accounts (id, email, balance, status) VALUES ($1, $2, 1, 'blah')", uuid, email)
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "Invalid account_status: \"blah\"")
 	default:
 		t.Fail()
 	}
