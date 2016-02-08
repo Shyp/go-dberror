@@ -10,7 +10,9 @@ import (
 )
 
 const uuid = "3c7d2b4a-3fc8-4782-a518-4ce9efef51e7"
+const uuid2 = "91f47e99-d616-4d8c-9c02-cbd13bceac60"
 const email = "test@example.com"
+const email2 = "test2@example.com"
 
 var db *sql.DB
 
@@ -31,6 +33,13 @@ func setUp(t *testing.T) {
 	}
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func tearDown(t *testing.T) {
+	if db != nil {
+		_, err := db.Exec("DELETE FROM accounts CASCADE; DELETE FROM payments CASCADE;")
+		test.AssertNotError(t, err, "")
 	}
 }
 
@@ -125,7 +134,60 @@ func TestTooLargeInt(t *testing.T) {
 	}
 }
 
+func TestUniqueConstraint(t *testing.T) {
+	setUp(t)
+	query := "INSERT INTO accounts (id, email, balance) VALUES ($1, $2, 1)"
+	_, err := db.Exec(query, uuid, email)
+	test.AssertNotError(t, err, "")
+	_, err = db.Exec(query, uuid, email)
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "A id already exists with this value (3c7d2b4a-3fc8-4782-a518-4ce9efef51e7)")
+		test.AssertEquals(t, e.Column, "id")
+		test.AssertEquals(t, e.Table, "accounts")
+		test.AssertEquals(t, e.Code, CodeUniqueViolation)
+	default:
+		t.Fail()
+	}
+	tearDown(t)
+}
+
+func TestUniqueFailureOnUpdate(t *testing.T) {
+	setUp(t)
+	query := "INSERT INTO accounts (id, email, balance) VALUES ($1, $2, 1)"
+	_, err := db.Exec(query, uuid, email)
+	test.AssertNotError(t, err, "")
+	_, err = db.Exec(query, uuid2, email2)
+	test.AssertNotError(t, err, "")
+
+	_, err = db.Exec("UPDATE accounts SET email = $1 WHERE id = $2", email, uuid2)
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "A email already exists with this value (test@example.com)")
+		test.AssertEquals(t, e.Column, "email")
+		test.AssertEquals(t, e.Table, "accounts")
+		test.AssertEquals(t, e.Code, CodeUniqueViolation)
+	default:
+		t.Fail()
+	}
+	tearDown(t)
+}
+
 func TestCapitalize(t *testing.T) {
 	test.AssertEquals(t, capitalize("foo"), "Foo")
 	test.AssertEquals(t, capitalize("foo bar baz"), "Foo bar baz")
+}
+
+func TestColumnFinder(t *testing.T) {
+	test.AssertEquals(t, findColumn("Key (id)=(blah) already exists."), "id")
+	test.AssertEquals(t, findColumn("Key (foo bar)=(blah) already exists."), "foo bar")
+	test.AssertEquals(t, findColumn("Unknown detail message"), "")
+}
+
+func TestValueFinder(t *testing.T) {
+	test.AssertEquals(t, findValue("Key (id)=(blah) already exists."), "blah")
+	test.AssertEquals(t, findValue("Key (foo)=(foo blah) already exists."), "foo blah")
+	test.AssertEquals(t, findValue("Unknown detail message"), "")
 }

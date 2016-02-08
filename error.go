@@ -2,6 +2,7 @@ package dberror
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -13,6 +14,7 @@ const (
 	CodeNumericValueOutOfRange    = "22003"
 	CodeInvalidTextRepresentation = "22P02"
 	CodeNotNullViolation          = "23502"
+	CodeUniqueViolation           = "23505"
 	CodeCheckViolation            = "23514"
 )
 
@@ -48,6 +50,42 @@ func capitalize(s string) string {
 	return fmt.Sprintf("%c", unicode.ToTitle(r)) + s[size:]
 }
 
+var columnFinder *regexp.Regexp
+var valueFinder *regexp.Regexp
+
+func init() {
+	columnFinder = regexp.MustCompile(`Key \((.+)\)=`)
+	valueFinder = regexp.MustCompile(`Key \(.+\)=\((.+)\)`)
+}
+
+// findColumn finds the column in the given pq Detail error string. If the
+// column does not exist, the empty string is returned.
+//
+// detail can look like this:
+//    Key (id)=(3c7d2b4a-3fc8-4782-a518-4ce9efef51e7) already exists.
+func findColumn(detail string) string {
+	results := columnFinder.FindStringSubmatch(detail)
+	if len(results) < 2 {
+		return ""
+	} else {
+		return results[1]
+	}
+}
+
+// findColumn finds the column in the given pq Detail error string. If the
+// column does not exist, the empty string is returned.
+//
+// detail can look like this:
+//    Key (id)=(3c7d2b4a-3fc8-4782-a518-4ce9efef51e7) already exists.
+func findValue(detail string) string {
+	results := valueFinder.FindStringSubmatch(detail)
+	if len(results) < 2 {
+		return ""
+	} else {
+		return results[1]
+	}
+}
+
 // GetError parses a given database error and returns a human-readable
 // version of that error. If the error is unknown, it's returned as is.
 func GetError(err error) error {
@@ -57,6 +95,30 @@ func GetError(err error) error {
 	switch pqerr := err.(type) {
 	case *pq.Error:
 		switch pqerr.Code {
+		case CodeUniqueViolation:
+			columnName := findColumn(pqerr.Detail)
+			if columnName == "" {
+				columnName = "value"
+			}
+			valueName := findValue(pqerr.Detail)
+			var msg string
+			if valueName == "" {
+				msg = fmt.Sprintf("A %s already exists with that value", columnName)
+			} else {
+				msg = fmt.Sprintf("A %s already exists with this value (%s)", columnName, valueName)
+			}
+			dbe := &Error{
+				Message:    msg,
+				Code:       string(pqerr.Code),
+				Severity:   pqerr.Severity,
+				Constraint: pqerr.Constraint,
+				Table:      pqerr.Table,
+				Detail:     pqerr.Detail,
+			}
+			if columnName != "value" {
+				dbe.Column = columnName
+			}
+			return dbe
 		case CodeNumericValueOutOfRange:
 			msg := strings.Replace(pqerr.Message, "out of range", "too large or too small", 1)
 			return &Error{
