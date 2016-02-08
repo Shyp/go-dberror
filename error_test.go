@@ -101,7 +101,7 @@ func TestInvalidUUID(t *testing.T) {
 	}
 }
 
-func TestInvalidStatus(t *testing.T) {
+func TestInvalidEnum(t *testing.T) {
 	setUp(t)
 	_, err := db.Exec("INSERT INTO accounts (id, email, balance, status) VALUES ($1, $2, 1, 'blah')", uuid, email)
 	dberr := GetError(err)
@@ -111,4 +111,21 @@ func TestInvalidStatus(t *testing.T) {
 	default:
 		t.Fail()
 	}
+}
+
+func TestTooLargeInt(t *testing.T) {
+	setUp(t)
+	_, err := db.Exec("INSERT INTO accounts (id, email, balance) VALUES ($1, $2, 40000)", uuid, email)
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "Smallint too large or too small")
+	default:
+		t.Fail()
+	}
+}
+
+func TestCapitalize(t *testing.T) {
+	test.AssertEquals(t, capitalize("foo"), "Foo")
+	test.AssertEquals(t, capitalize("foo bar baz"), "Foo bar baz")
 }
