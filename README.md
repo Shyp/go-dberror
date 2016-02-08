@@ -32,11 +32,11 @@ against them in your application.
 ## Basic Usage
 
 ```go
-import "github.com/Shyp/dberror"
+import dberror "github.com/Shyp/go-dberror"
 
 func main() {
 	_, err := db.Exec("INSERT INTO accounts (id) VALUES (null)")
-	dberr := GetDBError(err)
+	dberr := dberror.GetDBError(err)
 	switch e := dberr.(type) {
 	case *dberror.Error:
 		fmt.Println(e.Error()) // "No id was provided. Please provide a id"
@@ -53,8 +53,11 @@ Failed check constraints are tricky - the native error messages just say
 So you can define your own constraint handlers, and then register them:
 
 ```go
+import dberror "github.com/Shyp/go-dberror"
+import "github.com/lib/pq"
+
 func init()
-	constraint := dberror.Constraint{
+	constraint := &dberror.Constraint{
 		Name: "accounts_balance_check",
 		GetError: func(e *pq.Error) *dberror.Error {
 			return &dberror.Error{
