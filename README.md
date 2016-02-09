@@ -36,7 +36,7 @@ import dberror "github.com/Shyp/go-dberror"
 
 func main() {
 	_, err := db.Exec("INSERT INTO accounts (id) VALUES (null)")
-	dberr := dberror.GetDBError(err)
+	dberr := dberror.GetError(err)
 	switch e := dberr.(type) {
 	case *dberror.Error:
 		fmt.Println(e.Error()) // "No id was provided. Please provide a id"
