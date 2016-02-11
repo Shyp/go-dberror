@@ -121,6 +121,19 @@ func TestInvalidUUID(t *testing.T) {
 	}
 }
 
+func TestInvalidJSON(t *testing.T) {
+	t.Parallel()
+	setUp(t)
+	_, err := db.Exec("INSERT INTO accounts (data) VALUES ('')")
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "Invalid input syntax for type json")
+	default:
+		t.Fail()
+	}
+}
+
 func TestInvalidEnum(t *testing.T) {
 	t.Parallel()
 	setUp(t)

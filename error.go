@@ -187,8 +187,14 @@ func GetError(err error) error {
 				Severity: pqerr.Severity,
 			}
 		case CodeInvalidTextRepresentation:
-			msg := strings.Replace(pqerr.Message, "invalid input syntax for", "Invalid input syntax for type", 1)
-			msg = strings.Replace(msg, "invalid input value for enum", "Invalid", 1)
+			msg := pqerr.Message
+			// Postgres tweaks with the message, play whack-a-mole until we
+			// figure out a better method of dealing with these.
+			if !strings.Contains(pqerr.Message, "invalid input syntax for type") {
+				msg = strings.Replace(pqerr.Message, "input syntax for", "input syntax for type", 1)
+			}
+			msg = strings.Replace(msg, "input value for enum ", "", 1)
+			msg = strings.Replace(msg, "invalid", "Invalid", 1)
 			return &Error{
 				Message:  msg,
 				Code:     string(pqerr.Code),
