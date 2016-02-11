@@ -3,6 +3,7 @@ package dberror
 import (
 	"database/sql"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/Shyp/go-dberror/Godeps/_workspace/src/github.com/letsencrypt/boulder/test"
@@ -16,12 +17,12 @@ const email2 = "test2@example.com"
 
 var db *sql.DB
 
-func TestNilError(t *testing.T) {
-	test.AssertEquals(t, GetError(nil), nil)
-}
+var mu sync.Mutex
 
 func setUp(t *testing.T) {
+	mu.Lock()
 	if db != nil {
+		mu.Unlock()
 		return
 	}
 	ci := os.Getenv("CI")
@@ -31,6 +32,7 @@ func setUp(t *testing.T) {
 	} else {
 		db, err = sql.Open("postgres", "postgres://ubuntu@localhost/circle_test?sslmode=disable")
 	}
+	mu.Unlock()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +45,12 @@ func tearDown(t *testing.T) {
 	}
 }
 
+func TestNilError(t *testing.T) {
+	test.AssertEquals(t, GetError(nil), nil)
+}
+
 func TestNotNull(t *testing.T) {
+	t.Parallel()
 	setUp(t)
 	_, err := db.Exec("INSERT INTO accounts (id) VALUES (null)")
 	dberr := GetError(err)
@@ -74,6 +81,9 @@ func TestDefaultConstraint(t *testing.T) {
 
 func TestCustomConstraint(t *testing.T) {
 	setUp(t)
+	defer func() {
+		constraintMap = map[string]*Constraint{}
+	}()
 	constraint := &Constraint{
 		Name: "accounts_balance_check",
 		GetError: func(e *pq.Error) *Error {
@@ -99,6 +109,7 @@ func TestCustomConstraint(t *testing.T) {
 }
 
 func TestInvalidUUID(t *testing.T) {
+	t.Parallel()
 	setUp(t)
 	_, err := db.Exec("INSERT INTO accounts (id) VALUES ('foo')")
 	dberr := GetError(err)
@@ -111,6 +122,7 @@ func TestInvalidUUID(t *testing.T) {
 }
 
 func TestInvalidEnum(t *testing.T) {
+	t.Parallel()
 	setUp(t)
 	_, err := db.Exec("INSERT INTO accounts (id, email, balance, status) VALUES ($1, $2, 1, 'blah')", uuid, email)
 	dberr := GetError(err)
@@ -123,6 +135,7 @@ func TestInvalidEnum(t *testing.T) {
 }
 
 func TestTooLargeInt(t *testing.T) {
+	t.Parallel()
 	setUp(t)
 	_, err := db.Exec("INSERT INTO accounts (id, email, balance) VALUES ($1, $2, 40000)", uuid, email)
 	dberr := GetError(err)
@@ -136,6 +149,7 @@ func TestTooLargeInt(t *testing.T) {
 
 func TestUniqueConstraint(t *testing.T) {
 	setUp(t)
+	defer tearDown(t)
 	query := "INSERT INTO accounts (id, email, balance) VALUES ($1, $2, 1)"
 	_, err := db.Exec(query, uuid, email)
 	test.AssertNotError(t, err, "")
@@ -150,11 +164,11 @@ func TestUniqueConstraint(t *testing.T) {
 	default:
 		t.Fail()
 	}
-	tearDown(t)
 }
 
 func TestUniqueFailureOnUpdate(t *testing.T) {
 	setUp(t)
+	defer tearDown(t)
 	query := "INSERT INTO accounts (id, email, balance) VALUES ($1, $2, 1)"
 	_, err := db.Exec(query, uuid, email)
 	test.AssertNotError(t, err, "")
@@ -172,11 +186,11 @@ func TestUniqueFailureOnUpdate(t *testing.T) {
 	default:
 		t.Fail()
 	}
-	tearDown(t)
 }
 
 func TestForeignKeyFailure(t *testing.T) {
 	setUp(t)
+	defer tearDown(t)
 	query := "INSERT INTO payments (id, account_id) VALUES ($1, $2)"
 	_, err := db.Exec(query, uuid, uuid2)
 
@@ -190,21 +204,23 @@ func TestForeignKeyFailure(t *testing.T) {
 	default:
 		t.Fail()
 	}
-	tearDown(t)
 }
 
 func TestCapitalize(t *testing.T) {
+	t.Parallel()
 	test.AssertEquals(t, capitalize("foo"), "Foo")
 	test.AssertEquals(t, capitalize("foo bar baz"), "Foo bar baz")
 }
 
 func TestColumnFinder(t *testing.T) {
+	t.Parallel()
 	test.AssertEquals(t, findColumn("Key (id)=(blah) already exists."), "id")
 	test.AssertEquals(t, findColumn("Key (foo bar)=(blah) already exists."), "foo bar")
 	test.AssertEquals(t, findColumn("Unknown detail message"), "")
 }
 
 func TestValueFinder(t *testing.T) {
+	t.Parallel()
 	test.AssertEquals(t, findValue("Key (id)=(blah) already exists."), "blah")
 	test.AssertEquals(t, findValue("Key (foo)=(foo blah) already exists."), "foo blah")
 	test.AssertEquals(t, findValue("Unknown detail message"), "")
