@@ -6,6 +6,8 @@ dependencies:
   pre:
     - go get github.com/tools/godep
     - go get bitbucket.org/liamstask/goose/cmd/goose
+    - go get github.com/letsencrypt/boulder/test
+    - go get github.com/lib/pq
 
   override:
     - mkdir -p "/home/ubuntu/.go_workspace/src/$IMPORT_PATH"

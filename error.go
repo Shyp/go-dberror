@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/Shyp/go-dberror/Godeps/_workspace/src/github.com/lib/pq"
+	"github.com/lib/pq"
 )
 
 // See http://www.postgresql.org/docs/9.3/static/errcodes-appendix.html for

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Shyp/go-dberror/Godeps/_workspace/src/github.com/letsencrypt/boulder/test"
-	"github.com/Shyp/go-dberror/Godeps/_workspace/src/github.com/lib/pq"
+	"github.com/letsencrypt/boulder/test"
+	"github.com/lib/pq"
 )
 
 const uuid = "3c7d2b4a-3fc8-4782-a518-4ce9efef51e7"
