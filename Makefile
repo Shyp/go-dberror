@@ -4,9 +4,10 @@ install:
 	go install ./...
 
 test:
-	go test ./...
+	go test -race ./... -timeout 2s
 
 test-install: 
-	go get bitbucket.org/liamstask/goose/cmd/goose
-	go get github.com/letsencrypt/boulder/test
+	-createdb dberror
+	go get -u bitbucket.org/liamstask/goose/cmd/goose
+	go get -u github.com/letsencrypt/boulder/test
 	goose up
