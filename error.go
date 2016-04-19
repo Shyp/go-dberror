@@ -19,6 +19,7 @@ const (
 	CodeForeignKeyViolation       = "23503"
 	CodeUniqueViolation           = "23505"
 	CodeCheckViolation            = "23514"
+	CodeLockNotAvailable          = "55P03"
 )
 
 // Error is a human-readable database error. Message should always be a
