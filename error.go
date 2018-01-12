@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 	"unicode/utf8"
 
@@ -52,10 +53,17 @@ type Constraint struct {
 }
 
 var constraintMap = map[string]*Constraint{}
+var constraintMu sync.RWMutex
 
 // RegisterConstraint tells dberror about your custom constraint and its error
-// handling.
+// handling. RegisterConstraint panics if you attempt to register two
+// constraints with the same name.
 func RegisterConstraint(c *Constraint) {
+	constraintMu.Lock()
+	defer constraintMu.Unlock()
+	if _, dup := constraintMap[c.Name]; dup {
+		panic("dberror: RegisterConstraint called twice for name " + c.Name)
+	}
 	constraintMap[c.Name] = c
 }
 
@@ -211,7 +219,9 @@ func GetError(err error) error {
 				Severity: pqerr.Severity,
 			}
 		case CodeCheckViolation:
+			constraintMu.RLock()
 			c, ok := constraintMap[pqerr.Constraint]
+			constraintMu.RUnlock()
 			if ok {
 				return c.GetError(pqerr)
 			} else {
