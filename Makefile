@@ -1,13 +1,18 @@
 .PHONY: install test
 
+GOOSE := $(GOPATH)/bin/goose
+
 install:
 	go install ./...
 
 test:
 	go test -race ./... -timeout 2s
 
-test-install:
+$(GOOSE):
+	go get -u github.com/kevinburke/goose/cmd/goose
+
+test-install: | $(GOOSE)
 	-createdb dberror
-	go get -u bitbucket.org/liamstask/goose/cmd/goose
 	go get -u github.com/letsencrypt/boulder/test
-	goose up
+	go get -u ./...
+	$(GOOSE) up
