@@ -30,7 +30,7 @@ func setUp(t *testing.T) {
 	if ci == "" {
 		db, err = sql.Open("postgres", "postgres://localhost/dberror?sslmode=disable")
 	} else {
-		db, err = sql.Open("postgres", "postgres://ubuntu@localhost/circle_test?sslmode=disable")
+		db, err = sql.Open("postgres", "postgres://postgres@localhost/dberror?sslmode=disable")
 	}
 	mu.Unlock()
 	if err != nil {

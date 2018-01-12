@@ -5,3 +5,7 @@ development:
 circle:
     driver: postgres
     open: user=ubuntu dbname=circle_test sslmode=disable
+
+travis:
+    driver: postgres
+    open: user=postgres dbname=dberror sslmode=disable
