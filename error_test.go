@@ -219,6 +219,24 @@ func TestForeignKeyFailure(t *testing.T) {
 	}
 }
 
+func TestForeignKeyParentDelete(t *testing.T) {
+	t.Parallel()
+	err := &pq.Error{
+		Severity: "ERROR", Code: "23503",
+		Message: "update or delete on table \"cars\" violates foreign key constraint \"toyota_car_id_fkey\" on table \"toyotas\"",
+		Detail:  "Key (id)=(0e46047b-69af-442d-a1c0-8a71960b7772) is still referenced from table \"toyotas\".", Hint: "", Position: "", InternalPosition: "", InternalQuery: "", Where: "", Schema: "public", Table: "toyotas", Column: "", DataTypeName: "", Constraint: "toyota_car_id_fkey", File: "ri_triggers.c", Line: "3335", Routine: "ri_ReportViolation"}
+	dberr := GetError(err)
+	switch e := dberr.(type) {
+	case *Error:
+		test.AssertEquals(t, e.Error(), "Can't update or delete cars records because the cars id (0e46047b-69af-442d-a1c0-8a71960b7772) is still referenced by the toyotas table")
+		test.AssertEquals(t, e.Column, "")
+		test.AssertEquals(t, e.Table, "toyotas")
+		test.AssertEquals(t, e.Code, CodeForeignKeyViolation)
+	default:
+		t.Fail()
+	}
+}
+
 func TestCapitalize(t *testing.T) {
 	t.Parallel()
 	test.AssertEquals(t, capitalize("foo"), "Foo")

@@ -73,15 +73,8 @@ func capitalize(s string) string {
 	return fmt.Sprintf("%c", unicode.ToTitle(r)) + s[size:]
 }
 
-var columnFinder *regexp.Regexp
-var valueFinder *regexp.Regexp
-var foreignKeyFinder *regexp.Regexp
-
-func init() {
-	columnFinder = regexp.MustCompile(`Key \((.+)\)=`)
-	valueFinder = regexp.MustCompile(`Key \(.+\)=\((.+)\)`)
-	foreignKeyFinder = regexp.MustCompile(`not present in table "(.+)"`)
-}
+var columnFinder = regexp.MustCompile(`Key \((.+)\)=`)
+var valueFinder = regexp.MustCompile(`Key \(.+\)=\((.+)\)`)
 
 // findColumn finds the column in the given pq Detail error string. If the
 // column does not exist, the empty string is returned.
@@ -111,8 +104,10 @@ func findValue(detail string) string {
 	}
 }
 
-// findColumn finds the referenced table in the given pq Detail error string.
-// If we can't find the table, we return the empty string.
+var foreignKeyFinder = regexp.MustCompile(`not present in table "(.+)"`)
+
+// findForeignKeyTable finds the referenced table in the given pq Detail error
+// string. If we can't find the table, we return the empty string.
 //
 // detail can look like this:
 //    Key (account_id)=(91f47e99-d616-4d8c-9c02-cbd13bceac60) is not present in table "accounts"
@@ -120,9 +115,18 @@ func findForeignKeyTable(detail string) string {
 	results := foreignKeyFinder.FindStringSubmatch(detail)
 	if len(results) < 2 {
 		return ""
-	} else {
-		return results[1]
 	}
+	return results[1]
+}
+
+var parentTableFinder = regexp.MustCompile(`update or delete on table "([^"]+)"`)
+
+func findParentTable(message string) string {
+	match := parentTableFinder.FindStringSubmatch(message)
+	if len(match) < 2 {
+		return ""
+	}
+	return match[1]
 }
 
 // GetError parses a given database error and returns a human-readable
@@ -174,9 +178,15 @@ func GetError(err error) error {
 			}
 			valueName := findValue(pqerr.Detail)
 			var msg string
-			if valueName == "" {
+			switch {
+			case strings.Contains(pqerr.Message, "update or delete"):
+				parentTable := findParentTable(pqerr.Message)
+				// in this case pqerr.Table contains the child table. there's
+				// probably more work we could do here.
+				msg = fmt.Sprintf("Can't update or delete %[1]s records because the %[1]s %s (%s) is still referenced by the %s table", parentTable, columnName, valueName, pqerr.Table)
+			case valueName == "":
 				msg = fmt.Sprintf("Can't save to %s because the %s isn't present %s", pqerr.Table, columnName, tablePart)
-			} else {
+			default:
 				msg = fmt.Sprintf("Can't save to %s because the %s (%s) isn't present %s", pqerr.Table, columnName, valueName, tablePart)
 			}
 			return &Error{
