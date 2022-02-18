@@ -8,6 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/jackc/pgconn"
 	"github.com/lib/pq"
 )
 
@@ -255,6 +256,27 @@ func GetError(err error) error {
 				Severity:   pqerr.Severity,
 			}
 		}
+	case *pgconn.PgError:
+		er := pq.Error{
+			Severity:         pqerr.Severity,
+			Code:             pq.ErrorCode(pqerr.Code),
+			Message:          pqerr.Message,
+			Detail:           pqerr.Detail,
+			Hint:             pqerr.Hint,
+			Position:         string(pqerr.Position),
+			InternalPosition: string(pqerr.InternalPosition),
+			InternalQuery:    pqerr.InternalQuery,
+			Where:            pqerr.Where,
+			Schema:           pqerr.SchemaName,
+			Table:            pqerr.TableName,
+			Column:           pqerr.ColumnName,
+			DataTypeName:     pqerr.DataTypeName,
+			Constraint:       pqerr.ConstraintName,
+			File:             pqerr.File,
+			Line:             string(pqerr.Line),
+			Routine:          pqerr.Routine,
+		}
+		return GetError(er)
 	default:
 		return pqerr
 	}
